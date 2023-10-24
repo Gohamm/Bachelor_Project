@@ -22,17 +22,17 @@ file_path = r'c:\Users\Ulrich\Desktop\GBE\Bachelor Project\masterdata_sheet.xlsx
 
 df = pd.read_excel(file_path, usecols=[0, 1])
 
-for index, row in df.iloc[1:].iterrows():
+for index, row in df.iloc[0:].iterrows():
     post_data[len(post_data)] = {
-        'keywords': row[0],
         'location_code': row[1],
+        'keywords': row[0],     
         'date_from': date_from,
         'date_to' : date_to
     }
 
 print(post_data)
 
-response = client.post("/v3/keywords_data/google_ads/search_volume/task_post", post_data)
+response = client.post("/v3/keywords_data/google_ads/search_volume/live", post_data)
 
 if response["status_code"] == 20000:
     print(response)
