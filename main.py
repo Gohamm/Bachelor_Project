@@ -30,6 +30,8 @@ for index, row in df.iloc[1:].iterrows():
         'date_to' : date_to
     }
 
+print(post_data)
+
 response = client.post("/v3/keywords_data/google_ads/search_volume/task_post", post_data)
 
 if response["status_code"] == 20000:
@@ -39,8 +41,8 @@ else:
     print("error. Code: %d Message: %s" % (response["status_code"], response["status_message"]))
 
 
-def handleAPIdata(): 
-    client = RestClient("login", "password")
+def handleAPIdata(response): 
+    
 
     response = client.get("/v3/keywords_data/google_ads/search_volume/tasks_ready")
 
