@@ -14,28 +14,64 @@ def read_excel_file(file_path):
     #read excel file and return dataframe
     return pd.read_excel(file_path, usecols=[0 ,1])
 
-def construct_post_data(df, date_from, date_to):
+def extract_keywords_and_locations(df):
+    #extract keywords and location codes from the dataframe
+    keyword_list = []
+    for index, row in df.iterrows():
+        keyword_info = {
+            'keyword': str(row.iloc[0]),
+            'location_code': int(row.iloc[1])
+        }
+        keyword_list.append(keyword_info)
+    return keyword_list
+
+def construct_post_data(keyword_list, date_from, date_to):
+
+    # Create a list to store all keywords within a task
+    all_keywords = []
+
+    # Loop through the list of keywords
+    for keyword_info in keyword_list:
+        # Accumulate all keywords
+        all_keywords.append(keyword_info['keyword'])
+
+    # Construct the post_data with all keywords
+    post_data = {
+        'location_code': int(keyword_list[0]['location_code']),  # Assuming all keywords have the same location_code
+        'keywords': all_keywords,
+        'date_from': date_from,
+        'date_to': date_to
+    }
+
+    return [post_data]
+
+
+
+
     #create a list to store keywords
-    post_data = {}
+    #post_data = []
+
+    #create a list to store keywords within a task
 
     #loop through the dataframe to gather keywords
-    for index, row in df.iterrows():
+    #for keyword_info in keyword_list:
         
         #construct the post_data with all keywords
-        keyword_data = {
-        'location_code': int(row[1]),
-        'keywords': [str(row[0])],     
-        'date_from': date_from,
-        'date_to' : date_to
-        }
-        post_data[str(index)] = keyword_data
+        #task_data = {
+        #'location_code': int(keyword_info['location_code']),
+        #'keywords': [keyword_info['keyword']],    
+        #'date_from': date_from,
+        #'date_to': date_to    
+        #}
+        #post_data.append(task_data)
+        
 
-    return post_data
+    #return post_data
 
 def make_api_request(client, url, post_data):
     #convert post_data to JSON format
     json_data = json.dumps(post_data)
-
+    
     #make a single API request
     return client.post(url, json_data)
 
@@ -44,7 +80,7 @@ def handle_api_respone(response):
     print("api response:", response)
     #handle the api response
     if response["status_code"] == 20000 and response.get("tasks_count", 0) > 0:
-        task = response["tasks"][0]
+        task = response.get("tasks", [])[0]
         if task["status_code"] == 20000:
             result = task.get("result", [])
             if result and isinstance(result, list):
@@ -54,7 +90,7 @@ def handle_api_respone(response):
 
                     date_info = keyword_info.get('monthly_searches', [])[0]
                     date = f"{date_info.get('year')}-{date_info.get('month'):02d}" if date_info else None
-                    
+
                     keyword_entry = {
                         'location_code': keyword_info.get('location_code'),
                         'keywords': [keyword_info.get('keyword')],
@@ -81,13 +117,18 @@ def main():
 
     #API credentials
     credentials = "YW5kcmVhc191bHJpY2hAaG90bWFpbC5jb206ZjQyMDNlMzIzMThkOWY5Yw=="
-    url = "https://api.dataforseo.com/v3/keywords_data/google_ads/search_volume/live"
+    url = "https://sandbox.dataforseo.com/v3/keywords_data/google/search_volume/live"
 
     #excel sheet location
     file_path = file_path = r'c:\Users\Ulrich\Desktop\GBE\Bachelor Project\masterdata_sheet.xlsx'
 
     df = read_excel_file(file_path)
-    post_data = construct_post_data(df, date_from, date_to)
+
+    #extract keywords and location codes
+    keyword_list = extract_keywords_and_locations(df)
+
+    #use the data to construct post_data
+    post_data = construct_post_data(keyword_list, date_from, date_to)
 
     print(post_data)
 
