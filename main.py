@@ -2,8 +2,9 @@ import pandas as pd
 import base64
 import requests
 from client import RestClient
-import time
+from datetime import datetime
 import json
+from sqlalchemy import create_engine, ARRAY, String, Date, Integer
 
 
 def authorize(login, password):
@@ -45,29 +46,6 @@ def construct_post_data(keyword_list, date_from, date_to):
 
     return [post_data]
 
-
-
-
-    #create a list to store keywords
-    #post_data = []
-
-    #create a list to store keywords within a task
-
-    #loop through the dataframe to gather keywords
-    #for keyword_info in keyword_list:
-        
-        #construct the post_data with all keywords
-        #task_data = {
-        #'location_code': int(keyword_info['location_code']),
-        #'keywords': [keyword_info['keyword']],    
-        #'date_from': date_from,
-        #'date_to': date_to    
-        #}
-        #post_data.append(task_data)
-        
-
-    #return post_data
-
 def make_api_request(client, url, post_data):
     #convert post_data to JSON format
     json_data = json.dumps(post_data)
@@ -78,34 +56,76 @@ def make_api_request(client, url, post_data):
 def handle_api_respone(response):
 
     print("api response:", response)
-    #handle the api response
+
     if response["status_code"] == 20000 and response.get("tasks_count", 0) > 0:
-        task = response.get("tasks", [])[0]
-        if task["status_code"] == 20000:
-            result = task.get("result", [])
-            if result and isinstance(result, list):
-                #extract and return a dataframe from the response
-                keyword_data = []
-                for keyword_info in result:
+        tasks = response.get("tasks", [])
 
-                    date_info = keyword_info.get('monthly_searches', [])[0]
-                    date = f"{date_info.get('year')}-{date_info.get('month'):02d}" if date_info else None
+        if tasks and isinstance(tasks, list):
+            keyword_data = []
 
-                    keyword_entry = {
-                        'location_code': keyword_info.get('location_code'),
-                        'keywords': [keyword_info.get('keyword')],
-                        'search_volume': keyword_info.get('search_volume'),
-                        'date': date
-                    }
-                    keyword_data.append(keyword_entry)
+            for task in tasks:
+                results = task.get("result", [])
 
+                for result_info in results:
+                    keyword = result_info.get("keyword")
+                    location_code = result_info.get("location_code")
+                    monthly_searches = result_info.get("monthly_searches", [])
+
+                    if monthly_searches:
+                        keywords = [keyword]
+                        for monthly_search in monthly_searches:
+                            date = f"{monthly_search.get('year')}-{monthly_search.get('month'):02d}" if monthly_search else None
+                            search_volume = monthly_search.get("search_volume")
+
+                            keyword_entry = {
+                                "location_code": location_code,
+                                "keywords": keywords,
+                                "search_volume": search_volume,
+                                "date": date,
+                            }
+                            keyword_data.append(keyword_entry)
+
+            if keyword_data:
                 df_result = pd.DataFrame(keyword_data)
-                return df_result[['location_code', 'keywords', 'search_volume', 'date']]
-                
-                #return pd.DataFrame(response['result'][1:], columns=response['result'][0])
+                print("DataFrame columns:", df_result.columns)
+                return df_result
+            else:
+                print("No keyword data found.")
+                return None
+
     else:
         print("Error. Code: %d Message: %s" % (response["status_code"], response["status_message"]))
         return None
+
+def append_to_database(df):
+    # PostgreSQL connection parameters
+    db_params = {
+        'host': 'localhost',
+        'port': '5432',
+        'database': 'bachelordb',
+        'user': 'postgres',
+        'password': 'andr294567'
+    }
+
+    # Connect to the PostgreSQL database
+    # Create a connection string for SQLAlchemy
+    conn_str = f"postgresql://{db_params['user']}:{db_params['password']}@{db_params['host']}:{db_params['port']}/{db_params['database']}"
+
+    try:
+        # Create a SQLAlchemy engine
+        engine = create_engine(conn_str)
+
+        #convert 'date' column to datetime
+        df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.date
+
+        # Append DataFrame to PostgreSQL table
+        df.to_sql('api_data', con=engine, if_exists='append', index=False, dtype={'keywords': ARRAY(String()), 'search_volume': Integer(), 'date': Date()})
+        print("Data appended to PostgreSQL table successfully.")
+    except Exception as e:
+        print(f"Error appending data to PostgreSQL table: {str(e)}")
+    finally:
+        # Dispose of the engine to close the database connection
+        engine.dispose()
 
 def main():
     login = "andreas_ulrich@hotmail.com"
@@ -116,7 +136,6 @@ def main():
     client = authorize(login, password)
 
     #API credentials
-    credentials = "YW5kcmVhc191bHJpY2hAaG90bWFpbC5jb206ZjQyMDNlMzIzMThkOWY5Yw=="
     url = "https://sandbox.dataforseo.com/v3/keywords_data/google/search_volume/live"
 
     #excel sheet location
@@ -140,6 +159,9 @@ def main():
     if df_result is not None:
         print("success!")
         print(df_result)
+
+        #append the dataframe to postgres database
+        append_to_database(df_result)
 
 if __name__ == "__main__":
     main()
