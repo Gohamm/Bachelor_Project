@@ -128,14 +128,18 @@ def append_to_database(df):
         engine.dispose()
 
 def main():
+
+    # credentials
     login = "andreas_ulrich@hotmail.com"
     password = "f4203e32318d9f9c"
+
+    # specifying the date range to fetch data
     date_from = "2023-06-01"
     date_to = "2023-06-30"
 
     client = authorize(login, password)
 
-    #API credentials
+    # API url
     url = "https://sandbox.dataforseo.com/v3/keywords_data/google/search_volume/live"
 
     #excel sheet location
@@ -153,6 +157,7 @@ def main():
 
     response = make_api_request(client, url, post_data)
 
+    # create a dataframe to store api results
     df_result = handle_api_respone(response)
 
     #print dataframe
