@@ -47,10 +47,10 @@ def construct_post_data(keyword_list, date_from, date_to):
     return [post_data]
 
 def make_api_request(client, url, post_data):
-    #convert post_data to JSON format
+    # convert post_data to JSON format
     json_data = json.dumps(post_data)
     
-    #make a single API request
+    # make a single API request
     return client.post(url, json_data)
 
 def handle_api_respone(response):
@@ -100,7 +100,7 @@ def handle_api_respone(response):
 def append_to_database(df):
     # PostgreSQL connection parameters
     db_params = {
-        'host': 'localhost',
+        'host': '34.89.54.138',
         'port': '5432',
         'database': 'bachelordb',
         'user': 'postgres',
@@ -118,8 +118,11 @@ def append_to_database(df):
         #convert 'date' column to datetime
         df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.date
 
+        # Convert 'keywords' column from list to concatenated string
+        df['keywords'] = df['keywords'].apply(lambda x: ', '.join(x) if isinstance(x, list) else x)
+
         # Append DataFrame to PostgreSQL table
-        df.to_sql('api_data', con=engine, if_exists='append', index=False, dtype={'keywords': ARRAY(String()), 'search_volume': Integer(), 'date': Date()})
+        df.to_sql('api_data', con=engine, if_exists='append', index=False, schema='dataforseo', dtype={'keywords': String(), 'search_volume': Integer(), 'date': Date()})
         print("Data appended to PostgreSQL table successfully.")
     except Exception as e:
         print(f"Error appending data to PostgreSQL table: {str(e)}")
